@@ -141,7 +141,7 @@ The bootstrap script will:
 
 The experiments use various speculative decoding configurations via `--speculative-config`:
 
-```json
+```json5
 {
     "method": null,
     // null for standard SD, "eagle" for EAGLE
