@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools"]
+
+[project]
+name = "minedraft"
+version = "0.9.2"
+description = "Parallel Speculative Decoding plugin for vLLM"
+dependencies = [
+    'torch-scatter==2.1.2'
+]
+
+[project.optional-dependencies]
+benchmark = [
+    "datasets",
+    "nvitop",
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "IPython",
+    "tqdm",
+]
+
+[project.entry-points."vllm.general_plugins"]
+minedraft = "minedraft.plugin.plugin:minedraft_plugin"
+
+[tool.setuptools]
+packages = [
+    "minedraft",
+    "minedraft.benchmarks",
+    "minedraft.plugin",
+    "minedraft.plugin.core",
+    "minedraft.plugin.distributed",
+    "minedraft.plugin.engine",
+    "minedraft.plugin.model_executor.layers",
+    "minedraft.plugin.spec_decode",
+    "minedraft.plugin.worker",
+]
+

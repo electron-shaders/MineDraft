@@ -1,0 +1,10 @@
+#!/bin/bash
+bash experiment_1_parallel.sh
+bash experiment_2_eagle_parallel.sh
+bash experiment_2_llama_parallel.sh
+bash experiment_3_n_llama_parallel.sh
+bash experiment_3_n_qwen_parallel.sh
+bash experiment_4_bs_parallel.sh
+bash experiment_5_tetris_llama_parallel.sh
+bash experiment_5_tetris_qwen_parallel.sh
+bash experiment_6_nsys.sh

@@ -1,0 +1,8 @@
+#!/bin/bash
+bash experiment_1_sequential.sh
+bash experiment_2_eagle_sequential.sh
+bash experiment_2_llama_sequential.sh
+bash experiment_3_n_llama_sequential.sh
+bash experiment_3_n_qwen_sequential.sh
+bash experiment_4_bs_sequential.sh
+bash experiment_5_tetris_qwen_sequential.sh

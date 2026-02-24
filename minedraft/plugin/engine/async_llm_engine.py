@@ -1,0 +1,176 @@
+import time
+from typing import List, Union
+
+from vllm.engine.async_llm_engine import _AsyncLLMEngine
+from vllm.engine.llm_engine import SchedulerOutputState
+from vllm.outputs import EmbeddingRequestOutput, RequestOutput
+
+import minedraft.benchmarks.trace as CTrace
+from minedraft.benchmarks.trace import TRACER, Step
+from minedraft.patching import MinePatch
+from minedraft.plugin.core.scheduler import rid_tid_map
+from minedraft.plugin.sequence import MineExecuteModelRequest
+
+
+class AsyncLLMEnginePatch(MinePatch[_AsyncLLMEngine]):
+    async def step_async(
+        self: _AsyncLLMEngine, virtual_engine: int
+    ) -> List[Union[RequestOutput, EmbeddingRequestOutput]]:
+        # [Parallel SD] Add a trace for the step
+        step_tid = TRACER.add(CTrace.Step)
+        step_trace: Step = TRACER.get(step_tid)
+        step_trace.start_us = time.perf_counter() * 1e6
+
+        # these are cached outputs from previous iterations. None if on first
+        # iteration
+        cached_outputs = self.cached_scheduler_outputs[virtual_engine]
+        seq_group_metadata_list = cached_outputs.seq_group_metadata_list
+        scheduler_outputs = cached_outputs.scheduler_outputs
+        allow_async_output_proc = cached_outputs.allow_async_output_proc
+
+        ctx = self.scheduler_contexts[virtual_engine]
+
+        # Clear outputs for each new scheduler iteration
+        ctx.request_outputs.clear()
+
+        # skip the scheduler if there are any remaining steps in the seq groups.
+        # This ensures that the scheduler is only called again when the current
+        # batch has completed.
+        if not self._has_remaining_steps(seq_group_metadata_list):
+
+            # Schedule iteration
+            (seq_group_metadata_list, scheduler_outputs,
+             allow_async_output_proc
+             ) = self.scheduler[virtual_engine].schedule()
+
+            ctx.seq_group_metadata_list = seq_group_metadata_list
+            ctx.scheduler_outputs = scheduler_outputs
+
+            if not scheduler_outputs.is_empty():
+                # [Parallel SD] Update the step trace with scheduler outputs
+                step_trace.is_prompt_run = scheduler_outputs.num_prefill_groups
+                step_trace.batched_token_num = scheduler_outputs.num_batched_tokens
+                step_trace.batched_requests = [
+                    rid_tid_map[r.seq_group.seqs[0].seq_id]
+                    for r in scheduler_outputs.scheduled_seq_groups
+                ]
+
+                # this will cause mamba_cache/minimax_cache failed
+                # to release finished_requests_ids of the last steps
+                finished_requests_ids = self.scheduler[
+                    virtual_engine].get_and_reset_finished_requests_ids()
+
+            # Maybe switch from async mode to sync mode
+            if not allow_async_output_proc and len(ctx.output_queue) > 0:
+                self._process_model_outputs(ctx=ctx)
+
+            if (self.scheduler_config.is_multi_step
+                    and scheduler_outputs.num_lookahead_slots > 0):
+                # cache the scheduler outputs for the next iteration if we have
+                # lookahead slots
+                self._cache_scheduler_outputs_for_multi_step(
+                    virtual_engine, seq_group_metadata_list, scheduler_outputs,
+                    allow_async_output_proc)
+        else:
+            finished_requests_ids = list()
+
+        assert seq_group_metadata_list is not None
+        assert scheduler_outputs is not None
+
+        if not scheduler_outputs.is_empty():
+
+            # Check if we have a cached last_output from the previous iteration.
+            # For supporting PP this is probably the best way to pass the
+            # sampled_token_ids, as a separate broadcast over all the PP stages
+            # will cause one virtual engine's microbatch to block the pipeline.
+            last_sampled_token_ids = \
+                self._get_last_sampled_token_ids(virtual_engine)
+
+            execute_model_req = MineExecuteModelRequest(
+                seq_group_metadata_list=seq_group_metadata_list,
+                blocks_to_swap_in=scheduler_outputs.blocks_to_swap_in,
+                blocks_to_swap_out=scheduler_outputs.blocks_to_swap_out,
+                blocks_to_copy=scheduler_outputs.blocks_to_copy,
+                virtual_engine=virtual_engine,
+                num_lookahead_slots=scheduler_outputs.num_lookahead_slots,
+                running_queue_size=scheduler_outputs.running_queue_size,
+                finished_requests_ids=finished_requests_ids,
+                # [Parallel SD] Pass the preempted requests ids
+                preempted_requests_ids=scheduler_outputs.preempted_requests_ids,
+                # We use ExecuteModelRequest to pass the last sampled_token_ids
+                # to each of the non-last PP stages for in-place prepare_input.
+                last_sampled_token_ids=last_sampled_token_ids)
+
+            if allow_async_output_proc:
+                execute_model_req.async_callback = self.async_callbacks[
+                    virtual_engine]
+
+            # Execute the model.
+            outputs = await self.model_executor.execute_model_async(
+                execute_model_req)
+
+            # we need to do this here so that last step's sampled_token_ids can
+            # be passed to the next iteration for PP.
+            if self.scheduler_config.is_multi_step:
+                self._update_cached_scheduler_output(virtual_engine, outputs)
+        else:
+            if len(ctx.output_queue) > 0:
+                self._process_model_outputs(ctx=ctx)
+            outputs = []
+
+        # Finish the current step for all the sequence groups.
+        if self.scheduler_config.is_multi_step:
+            for seq_group in seq_group_metadata_list:
+                seq_group.finish_step()
+
+        if not self._has_remaining_steps(seq_group_metadata_list):
+            # Clear the cache if we have finished all the steps
+            if self.scheduler_config.is_multi_step:
+                self.cached_scheduler_outputs[
+                    virtual_engine] = SchedulerOutputState()
+
+            # is_first_step_output is True only when the num_steps of all
+            # the sequences are 1. When the num_steps > 1,
+            # multi_step_model_runner does the first-step output append.
+            is_first_step_output: bool = False if not seq_group_metadata_list \
+                else seq_group_metadata_list[0].state.num_steps == 1
+
+            ctx.append_output(outputs=outputs,
+                              seq_group_metadata_list=seq_group_metadata_list,
+                              scheduler_outputs=scheduler_outputs,
+                              is_async=allow_async_output_proc,
+                              is_last_step=True,
+                              is_first_step_output=is_first_step_output)
+
+            if outputs and allow_async_output_proc:
+                assert len(
+                    outputs
+                ) == 1, "Async postprocessor expects only a single output set"
+                self._advance_to_next_step(
+                    outputs[0], seq_group_metadata_list,
+                    scheduler_outputs.scheduled_seq_groups)
+
+            if not allow_async_output_proc:
+                self._process_model_outputs(ctx=ctx)
+
+                # Log stats.
+                self.do_log_stats(scheduler_outputs, outputs)
+
+                # Tracing
+                self.do_tracing(scheduler_outputs)
+
+        else:
+            # Multi-step case
+            # [Parallel SD] Record the end time of the current step
+            step_trace.end_us = time.perf_counter() * 1e6
+            return ctx.request_outputs
+
+        if not self.has_unfinished_requests():
+            # Drain async postprocessor (if exists)
+            if len(ctx.output_queue) > 0:
+                self._process_model_outputs(ctx=ctx)
+            assert len(ctx.output_queue) == 0
+
+        # [Parallel SD] Record the end time of the current step
+        step_trace.end_us = time.perf_counter() * 1e6
+        return ctx.request_outputs
