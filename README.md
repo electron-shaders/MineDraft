@@ -1,4 +1,4 @@
-# MineDraft: A Framework for Batch Parallel Speculative Decoding
+# <img src="pickaxe.PNG" alt="logo" width="32" height="32"> MineDraft: A Framework for Batch Parallel Speculative Decoding
 
 
 ## Environment Requirements
