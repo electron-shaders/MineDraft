@@ -18,7 +18,7 @@ batch_size=16
 
 for DRAFT in "Qwen/Qwen3-0.6B" "Qwen/Qwen3-1.7B" "Qwen/Qwen3-4B"
 do
-     if [ "$num_prompts" -gt 1000 ] && { [ "$dataset" = "spec_bench.json" ] || [ "$dataset" = "tough.json" ]; }; then
+    if [ "$num_prompts" -gt 1000 ] && { [ "$dataset" = "spec_bench.json" ] || [ "$dataset" = "tough.json" ]; }; then
         continue
     fi
     if [ $dataset == "ShareGPT.json" ]; then
@@ -29,7 +29,7 @@ do
         input_len=16
     fi
 
-    for k in 3 4
+    for k in 1 2 3 4
     do
         # Parallel
         nsys profile -o "${TARGET//\//_}_${DRAFT//\//_}_k${k}_spec_bench.nsys-rep" --force-overwrite true --trace-fork-before-exec=true --cuda-graph-trace=node \

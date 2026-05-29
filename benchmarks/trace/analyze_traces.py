@@ -74,6 +74,7 @@ def get_step_stats(step_traces, prompt_runs):
     accepted = np.zeros(len(step_traces) - prompt_runs, dtype=np.uint64)
     generated = np.zeros(len(step_traces) - prompt_runs, dtype=np.uint64)
     preempted = np.zeros(len(step_traces) - prompt_runs, dtype=np.uint64)
+    parallelized = np.zeros(len(step_traces) - prompt_runs, dtype=bool)
     step_generation_times = np.zeros(len(step_traces) - prompt_runs, dtype=np.float64)
     i = 0
     for trace in step_traces:
@@ -83,9 +84,10 @@ def get_step_stats(step_traces, prompt_runs):
             accepted[i] = trace["accepted_num"]
             generated[i] = trace["generated_num"]
             preempted[i] = len(trace.get("preempted_requests", []))
+            parallelized[i] = trace.get("is_parallelised", False)
             step_generation_times[i] = (trace["end_us"] - trace["start_us"]) / 1e6
             i += 1
-    return drafted, verified, accepted, generated, preempted, step_generation_times
+    return drafted, verified, accepted, generated, preempted, parallelized, step_generation_times
 
 
 def analyze(filename):
@@ -184,7 +186,8 @@ def analyze(filename):
             step_accepted_tokens, # accepted_num
             step_generated_tokens, # generated_num
             step_preempted_requests, # len(preempted_requests)
-            step_generation_times # (end_us - start_us)
+            step_parallelized, # is_parallel
+            step_generation_times, # (end_us - start_us)
         ) = get_step_stats(step_traces, prompt_runs)
 
         bundles[i] = {
@@ -193,6 +196,7 @@ def analyze(filename):
             "target_model": target_model,
             "draft_model": draft_model,
             "batch_size": batch_size,
+            "is_parallel": is_parallel,
             "method": method,
             "k": k,
             "e": e,
@@ -211,6 +215,7 @@ def analyze(filename):
             "step_verified_tokens": step_verified_tokens,
             "step_accepted_tokens": step_accepted_tokens,
             "step_generated_tokens": step_generated_tokens,
-            "step_preempted_requests": step_preempted_requests
+            "step_preempted_requests": step_preempted_requests,
+            "step_parallelized": step_parallelized,
         }
     return bundles
