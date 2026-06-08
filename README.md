@@ -296,7 +296,7 @@ If you find MineDraft useful in your research, please cite:
 @inproceedings{tang2026minedraft,
   title     = {MineDraft: A Framework for Batch Parallel Speculative Decoding},
   author    = {Tang, Zhenwei and Verma, Arun and Zhou, Zijian and Wu, Zhaoxuan
-             and Prakash, Alok and Rus, Daniela and Low, Bryan Kian Hsiang},
+                and Prakash, Alok and Rus, Daniela and Low, Bryan Kian Hsiang},
   booktitle = {Proceedings of the 43rd International Conference on Machine Learning},
   year      = {2026}
 }
