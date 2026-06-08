@@ -5,7 +5,7 @@
 # MineDraft: A Framework for Batch Parallel Speculative Decoding
 
 <a href="https://arxiv.org/abs/2603.18016" target="_blank"><img src="https://img.shields.io/badge/arXiv-2603.18016-b31b1b.svg?style=for-the-badge" alt="arXiv"></a>
-<a href="https://arunv3rma.github.io/blogs/minedraft/minedraft.html" target="_blank"><img src="https://img.shields.io/badge/Project-Blog-green.svg?style=for-the-badge" alt="Project Blog"></a>
+<a href="https://arunv3rma.github.io/blogs/minedraft" target="_blank"><img src="https://img.shields.io/badge/Project-Blog-green.svg?style=for-the-badge" alt="Project Blog"></a>
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![vLLM](https://img.shields.io/badge/plugin-vLLM-blue.svg?style=for-the-badge)](https://github.com/vllm-project/vllm)
 [![Python](https://img.shields.io/badge/Python-3.9--3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
@@ -293,12 +293,12 @@ Upgrade to Nsight Systems ≥ 2024.2 from the [NVIDIA developer portal](https://
 If you find MineDraft useful in your research, please cite:
 
 ```bibtex
-@article{tang2026minedraft,
-  title   = {MineDraft: A Framework for Batch Parallel Speculative Decoding},
-  author  = {Tang, Zhenwei and Verma, Arun and Zhou, Zijian and Wu, Zhaoxuan
+@inproceedings{tang2026minedraft,
+  title     = {MineDraft: A Framework for Batch Parallel Speculative Decoding},
+  author    = {Tang, Zhenwei and Verma, Arun and Zhou, Zijian and Wu, Zhaoxuan
              and Prakash, Alok and Rus, Daniela and Low, Bryan Kian Hsiang},
-  journal = {arXiv preprint arXiv:2603.18016},
-  year    = {2026}
+  booktitle = {Proceedings of the 43rd International Conference on Machine Learning},
+  year      = {2026}
 }
 ```
 
