@@ -115,7 +115,7 @@ pip install vllm==0.9.2 --extra-index-url https://download.pytorch.org/whl/cu128
 **Step 3 — Install MineDraft:**
 
 ```bash
-pip install -e ".[benchmark]"
+pip install -e ".[benchmark]" --no-build-isolation
 ```
 
 This installs:
