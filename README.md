@@ -89,7 +89,7 @@ source venv/bin/activate
 
 ```bash
 uv venv --python 3.12 --seed
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
 </details>
